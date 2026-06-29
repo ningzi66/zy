@@ -1,1 +1,554 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图书分类检索系统</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background-color: #000000;
+  overflow-x: hidden;
+}
+/* 顶部导航栏 全屏黑色背景，固定置顶 */
+.top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 20px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #000000;
+  z-index: 999;
+}
+/* 左上角三横线菜单图标 */
+.menu-icon {
+  width: 30px;
+  height: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.menu-icon span {
+  width: 100%;
+  height: 3px;
+  background-color: #fff;
+  border-radius: 2px;
+}
+/* 右上角登录注册文字 */
+.login-box a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 16px;
+}
+.login-box span {
+  color: #aaa;
+  margin: 0 8px;
+}
+
+/* 左侧侧边工具栏 */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -280px;
+  width: 280px;
+  height: 100vh;
+  background: #111;
+  padding-top: 80px;
+  transition: left 0.3s ease;
+  z-index: 1000;
+}
+.sidebar.open {
+  left: 0;
+}
+.sidebar ul {
+  list-style: none;
+}
+.sidebar li {
+  padding: 16px 30px;
+}
+.sidebar li a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 17px;
+  display: block;
+}
+.sidebar li:hover {
+  background: #222;
+}
+/* 遮罩层 */
+.mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  z-index: 998;
+}
+.mask.show {
+  display: block;
+}
+
+/* 欢迎标题样式，增加上边距防止被导航遮挡 */
+.welcome-title {
+  color: #ffffff;
+  font-size: 48px;
+  text-align: left;
+  padding-left: 30px;
+  padding-top: 80px;
+  letter-spacing: 3px;
+  font-weight: 300;
+}
+.sub-desc {
+  color: #aaa;
+  font-size: 16px;
+  padding-left: 30px;
+  margin-top: 10px;
+  letter-spacing: 1px;
+  font-style: italic;
+}
+/* 白色搜索框 */
+.search-input {
+  display: block;
+  margin: 20px 0 0 30px;
+  width: 420px;
+  height: 45px;
+  padding: 0 15px;
+  font-size: 16px;
+  background: #fff;
+  border: none;
+  outline: none;
+}
+.search-input::placeholder {
+  color: #999;
+}
+
+/* 简约书籍推荐区域 */
+.recommend-wrap {
+  margin: 30px 0 0 30px;
+}
+.recommend-title {
+  color: #cccccc;
+  font-size: 18px;
+  margin-bottom: 15px;
+  letter-spacing: 1px;
+}
+.recommend-list {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.recommend-list::-webkit-scrollbar {
+  height: 4px;
+}
+.recommend-list::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 2px;
+}
+.book-card {
+  flex-shrink: 0;
+  width: 130px;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+}
+.book-cover {
+  width: 130px;
+  height: 180px;
+  background: #222;
+  border: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #888;
+  margin-bottom: 10px;
+  transition: border-color 0.2s;
+}
+.book-card:hover .book-cover {
+  border-color: #666;
+}
+.book-name {
+  font-size: 15px;
+  color: #eee;
+}
+
+/* 色块外层滚动容器，实现左右滑动 */
+.slide-container {
+  margin-left: 30px;
+  margin-top: 30px;
+  width: calc(100% - 30px);
+  height: calc(100vh - 220px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 优化滚动手感 */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+/* 自定义横向滚动条样式 */
+.slide-container::-webkit-scrollbar {
+  height: 5px;
+}
+.slide-container::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+.slide-container::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+/* 色块内部定位容器 */
+.blocks-container {
+  width: max-content;
+  position: relative;
+  height: 100%;
+}
+
+/* 色块基础样式 */
+.fold-block {
+  position: absolute;
+  top: 0;
+  width: 90px;
+  height: 100%;
+  border-radius: 0;
+  overflow: hidden;
+  transition: width 0.5s ease, left 0.5s ease;
+  cursor: pointer;
+}
+/* 展开状态宽度放大 */
+.fold-block.active {
+  width: 320px;
+}
+/* 文字容器向左偏移20px，中英文同一垂直线排列 */
+.text-inner {
+  position: absolute;
+  left: -20px;
+  top: 0;
+  width: 90px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 16px;
+  z-index: 2;
+}
+/* 中英文统一竖排格式 */
+.text-inner span {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: #fff;
+}
+/* 右侧拓展空白区域 */
+.extend-space {
+  position: absolute;
+  left: 90px;
+  top: 0;
+  height: 100%;
+  width: calc(100% - 90px);
+  background: rgba(0,0,0,0.35);
+  padding: 20px 10px;
+  overflow-y: auto;
+}
+/* 默认隐藏书籍列表 */
+.book-list {
+  display: none;
+  list-style: none;
+}
+/* 色块展开后显示列表 */
+.fold-block.active .book-list {
+  display: block;
+}
+.book-list li {
+  margin: 12px 0;
+  border-bottom: 1px solid #444;
+  padding-bottom: 8px;
+}
+.book-list li a {
+  color: #eee;
+  text-decoration: none;
+  font-size: 15px;
+}
+.book-list li a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+/* 色块堆叠露出宽度固定为50px */
+.book1 { left: 0;    background: #b91c1c; z-index: 1; }
+.book2 { left: 50;   background: #1d4ed8; z-index: 2; }
+.book3 { left: 100;  background: #047857; z-index: 3; }
+.book4 { left: 150;  background: #ca8a04; z-index: 4; }
+.book5 { left: 200;  background: #7e22ce; z-index: 5; }
+.book6 { left: 250;  background: #be185d; z-index: 6; }
+.book7 { left: 300;  background: #0891b2; z-index: 7; }
+.book8 { left: 350;  background: #475569; z-index: 8; }
+
+/* 页脚样式 */
+footer {
+  margin-top: 80px;
+  padding: 40px 30px;
+  border-top: 1px solid #222;
+  color: #777;
+  font-size: 14px;
+}
+.footer-wrap {
+  max-width: 1200px;
+}
+.footer-links {
+  margin-bottom: 20px;
+}
+.footer-links a {
+  color: #999;
+  text-decoration: none;
+  margin-right: 20px;
+}
+.footer-links a:hover {
+  color: #fff;
+}
+.copyright {
+  line-height: 1.8;
+}
+</style>
+</head>
+<body>
+<!-- 顶部导航：左侧三横线菜单 + 右侧登录注册 -->
+<div class="top-nav">
+  <div class="menu-icon" id="menuBtn">
+    <span></span>
+    <span></span>
+    <span></span>
+  </div>
+  <div class="login-box">
+    <a href="#">登陆</a>
+    <span>｜</span>
+    <a href="#">注册</a>
+  </div>
+</div>
+
+<!-- 左侧侧边工具栏 -->
+<div class="sidebar" id="sidebar">
+  <ul>
+    <li><a href="#">首页</a></li>
+    <li><a href="#">书籍分类</a></li>
+    <li><a href="#">我的书架</a></li>
+    <li><a href="#">浏览记录</a></li>
+    <li><a href="#">个人设置</a></li>
+    <li><a href="#">帮助中心</a></li>
+  </ul>
+</div>
+<!-- 遮罩 -->
+<div class="mask" id="mask"></div>
+
+<!-- 顶部欢迎文字区域 -->
+<h1 class="welcome-title">Welcome To Book Search</h1>
+<p class="sub-desc">书籍是人类进步的阶梯 —— 高尔基</p>
+<!-- 白色搜索框 -->
+<input class="search-input" type="text" placeholder="输入书籍名称、分类进行搜索...">
+
+<!-- 色块横向滚动区域（在上） -->
+<div class="slide-container">
+  <div class="blocks-container">
+    <div class="fold-block book1" data-index="0">
+      <div class="text-inner">
+        <span>Philosophy</span>
+        <span>哲学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">西方哲学史</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">理想国</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">沉思录</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book2" data-index="1">
+      <div class="text-inner">
+        <span>Science</span>
+        <span>科学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">时间简史</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">果壳中的宇宙</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">万物理论</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book3" data-index="2">
+      <div class="text-inner">
+        <span>Physics</span>
+        <span>物理学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">费曼物理学讲义</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">量子物理史话</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book4" data-index="3">
+      <div class="text-inner">
+        <span>Novel</span>
+        <span>小说</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">百年孤独</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">平凡的世界</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book5" data-index="4">
+      <div class="text-inner">
+        <span>Psychology</span>
+        <span>心理学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">乌合之众</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">自卑与超越</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book6" data-index="5">
+      <div class="text-inner">
+        <span>History</span>
+        <span>历史学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">史记</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">全球通史</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book7" data-index="6">
+      <div class="text-inner">
+        <span>Astronomy</span>
+        <span>天文学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">星空的琴弦</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">星座全书</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fold-block book8" data-index="7">
+      <div class="text-inner">
+        <span>Literature</span>
+        <span>文学</span>
+      </div>
+      <div class="extend-space">
+        <ul class="book-list">
+          <li><a href="https://www.baidu.com" target="_blank">红楼梦</a></li>
+          <li><a href="https://www.baidu.com" target="_blank">莎士比亚戏剧集</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 精选推荐区域（在下） -->
+<div class="recommend-wrap">
+  <h3 class="recommend-title">精选推荐</h3>
+  <div class="recommend-list">
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">人类简史</div>
+    </div>
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">月亮与六便士</div>
+    </div>
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">三体</div>
+    </div>
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">活着</div>
+    </div>
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">解忧杂货店</div>
+    </div>
+    <div class="book-card">
+      <div class="book-cover">封面</div>
+      <div class="book-name">围城</div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部页脚区域 -->
+<footer>
+  <div class="footer-wrap">
+    <div class="footer-links">
+      <a href="#">关于我们</a>
+      <a href="#">用户协议</a>
+      <a href="#">隐私政策</a>
+      <a href="#">意见反馈</a>
+      <a href="#">联系客服</a>
+    </div>
+    <div class="copyright">
+      ©2026 图书分类检索系统 版权所有<br>
+      豫ICP备12345678号
+    </div>
+  </div>
+</footer>
+
+<script>
+// 侧边栏逻辑
+const menuBtn = document.getElementById('menuBtn');
+const sidebar = document.getElementById('sidebar');
+const mask = document.getElementById('mask');
+
+function toggleSidebar(){
+  sidebar.classList.toggle('open');
+  mask.classList.toggle('show');
+}
+menuBtn.addEventListener('click', toggleSidebar);
+mask.addEventListener('click', toggleSidebar);
+
+// 色块展开收缩交互
+const blocks = Array.from(document.querySelectorAll('.fold-block'));
+const baseLeft = [0, 50, 100, 150, 200, 250, 300, 350];
+const expandDelta = 230;
+const expandState = [false, false, false, false, false, false, false, false];
+
+blocks.forEach((block, idx) => {
+  block.addEventListener('click', (e) => {
+    // 点击链接不触发色块收起
+    if(e.target.tagName === 'A') return;
+    expandState[idx] = !expandState[idx];
+    block.classList.toggle('active');
+    updatePositions();
+  });
+});
+
+function updatePositions() {
+  for (let i = 0; i < blocks.length; i++) {
+    let totalPush = 0;
+    for (let j = 0; j < i; j++) {
+      if (expandState[j]) totalPush += expandDelta;
+    }
+    blocks[i].style.left = `${baseLeft[i] + totalPush}px`;
+  }
+}
+updatePositions();
+</script>
+</body>
+</html>
